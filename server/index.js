@@ -30,6 +30,11 @@ function requireConfig() {
   if (!API_SECRET) missing.push('LIVEKIT_API_SECRET');
   if (!APP_SECRET || APP_SECRET.length < 24) missing.push('APP_SECRET (อย่างน้อย 24 ตัวอักษร)');
   if (missing.length) throw new Error(`Server config missing: ${missing.join(', ')}`);
+  if (new URL(WS_URL).protocol !== 'wss:') throw new Error('LIVEKIT_WS_URL must use wss://');
+  if (new URL(API_URL).protocol !== 'https:') throw new Error('LIVEKIT_API_URL must use https://');
+  if ([API_KEY, API_SECRET].some(value => value !== value.trim())) {
+    throw new Error('LiveKit credentials contain leading or trailing whitespace');
+  }
 }
 
 function b64url(input) {
@@ -154,13 +159,19 @@ app.post('/api/token', async (req, res) => {
       roomAdmin: role === 'host',
     });
 
+    const jwt = await token.toJwt();
+    if (typeof jwt !== 'string' || jwt.split('.').length !== 3) {
+      throw new Error('LiveKit SDK did not return a valid JWT string');
+    }
+    res.set('Cache-Control', 'no-store');
     res.json({
-      token: await token.toJwt(),
+      token: jwt,
       serverUrl: WS_URL,
       role,
       identity,
     });
   } catch (e) {
+    console.error('[LiveKit] token issuance failed', { errorType: e.name, status: e.status || 400 });
     res.status(e.status || 400).json({ error: e.message });
   }
 });
