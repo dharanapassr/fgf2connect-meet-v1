@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
+import { DisconnectReason } from 'livekit-client';
 import { createRoot } from 'react-dom/client';
 import {
   LiveKitRoom,
@@ -201,6 +202,28 @@ function AdminPanel({ roomCode, hostToken, onClose }) {
 
 function Meeting({ roomCode, joinInfo, userChoices, isHost, hostToken }) {
   const [adminOpen, setAdminOpen] = useState(isHost);
+  const [connectionError, setConnectionError] = useState('');
+  const connected = useRef(false);
+  const failed = useRef(false);
+
+  const onError = (error) => {
+    failed.current = true;
+    // Never log the SDK error object: it may include a URL containing the JWT.
+    const message = /invalid token|unauthorized|401/i.test(error?.message || '')
+      ? 'LiveKit ปฏิเสธ Token กรุณาตรวจ API Secret และโปรเจกต์ LiveKit บน Server'
+      : 'เชื่อมต่อ LiveKit ไม่สำเร็จ กรุณาตรวจเครือข่ายแล้วลองใหม่';
+    console.error('[LiveKit] connection failed', { message, errorType: error?.name });
+    setConnectionError(message);
+  };
+
+  if (connectionError) {
+    return <main className="prejoin-shell"><section className="prejoin-card">
+      <h2>ไม่สามารถเชื่อมต่อห้อง {roomCode}</h2>
+      <div className="error" role="alert">{connectionError}</div>
+      <button className="primary" onClick={() => window.location.reload()}>กลับไปลองเข้าห้องอีกครั้ง</button>
+      <p><a href="/">กลับหน้าแรก</a></p>
+    </section></main>;
+  }
 
   return (
     <div className="meeting-shell">
@@ -210,7 +233,19 @@ function Meeting({ roomCode, joinInfo, userChoices, isHost, hostToken }) {
         connect={true}
         video={userChoices.videoEnabled}
         audio={userChoices.audioEnabled}
-        onDisconnected={() => { window.location.href = '/'; }}
+        onConnected={() => { connected.current = true; }}
+        onError={onError}
+        onDisconnected={(reason) => {
+          if (connected.current && !failed.current && reason === DisconnectReason.CLIENT_INITIATED) {
+            window.location.href = '/';
+            return;
+          }
+          console.error('[LiveKit] disconnected', {
+            reason: DisconnectReason[reason] || 'UNKNOWN',
+            connectedPreviously: connected.current,
+          });
+          setConnectionError(previous => previous || `การเชื่อมต่อสิ้นสุด (${DisconnectReason[reason] || 'UNKNOWN'}) กรุณาลองเข้าห้องอีกครั้ง`);
+        }}
         data-lk-theme="default"
       >
         <VideoConference />
@@ -257,9 +292,16 @@ function RoomPage({ roomCode }) {
         name: values.username.trim(),
         hostToken: hostToken || undefined,
       });
+      if (typeof data.token !== 'string' || data.token.split('.').length !== 3) {
+        throw new Error('Server ส่ง LiveKit Token ในรูปแบบไม่ถูกต้อง');
+      }
+      if (new URL(data.serverUrl).protocol !== 'wss:') {
+        throw new Error('Server ต้องส่ง LiveKit URL แบบ wss://');
+      }
       setChoices(values);
       setJoinInfo(data);
     } catch (e) {
+      console.error('[LiveKit] join request failed', { errorType: e.name });
       setError(e.message);
     }
   };
