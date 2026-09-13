@@ -33,6 +33,37 @@ const MEDIA_DEVICE_ERROR_NAMES = new Set([
   'OverconstrainedError',
 ]);
 
+function isLineInAppBrowser() {
+  return /\bLine\//i.test(navigator.userAgent);
+}
+
+function LineBrowserGate() {
+  const externalUrl = new URL(window.location.href);
+  externalUrl.searchParams.set('openExternalBrowser', '1');
+  const httpsUrl = externalUrl.toString();
+  const isAndroid = /Android/i.test(navigator.userAgent);
+  const externalHref = isAndroid
+    ? `intent://${externalUrl.host}${externalUrl.pathname}${externalUrl.search}#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(httpsUrl)};end`
+    : httpsUrl;
+
+  return (
+    <main className="prejoin-shell">
+      <section className="prejoin-card line-browser-gate">
+        <div className="brand compact">
+          <div className="brand-mark"><Video size={22}/></div>
+          <div><strong>FGF2CONNECT</strong><span>MEET</span></div>
+        </div>
+        <h2>เปิดห้องประชุมใน Browser</h2>
+        <p>LINE ไม่รองรับการเปิดกล้องและไมโครโฟนสำหรับการประชุมนี้ กรุณาเปิดลิงก์ด้วย Chrome หรือ Browser ของเครื่อง</p>
+        <a className="primary external-browser-button" href={externalHref}>
+          เปิดด้วย {isAndroid ? 'Chrome' : 'Browser'}
+        </a>
+        <p className="privacy-note">หากปุ่มไม่เปิด Browser ให้กดเมนู ⋮ ของ LINE แล้วเลือก “เปิดในเบราว์เซอร์เริ่มต้น”</p>
+      </section>
+    </main>
+  );
+}
+
 function roomFromPath() {
   const match = window.location.pathname.match(/^\/r\/([A-Za-z0-9_-]+)$/);
   return match ? match[1].toUpperCase() : '';
@@ -214,7 +245,7 @@ function AdminPanel({ roomCode, hostToken, onClose }) {
 }
 
 function Meeting({ roomCode, joinInfo, userChoices, isHost, hostToken }) {
-  const [adminOpen, setAdminOpen] = useState(isHost);
+  const [adminOpen, setAdminOpen] = useState(false);
   const [connectionError, setConnectionError] = useState('');
   const connected = useRef(false);
   const failed = useRef(false);
@@ -371,6 +402,7 @@ function RoomPage({ roomCode }) {
 }
 
 function App() {
+  if (isLineInAppBrowser()) return <LineBrowserGate/>;
   const roomCode = roomFromPath();
   return roomCode ? <RoomPage roomCode={roomCode}/> : <Home/>;
 }

@@ -59,6 +59,12 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 }
 .join-form input:focus { border-color: #16a34a; box-shadow: 0 0 0 4px rgba(22,163,74,.08); }
 .microcopy, .privacy-note { color: #98a2b3; font-size: 12px; text-align: center; margin-top: 24px; }
+.line-browser-gate h2 { margin: 0 0 12px; font-size: 28px; }
+.line-browser-gate > p:not(.privacy-note) { color: #667085; line-height: 1.7; margin: 0 0 24px; }
+.external-browser-button {
+  display: block; width: 100%; padding: 16px 20px; border-radius: 14px;
+  font-weight: 800; text-align: center; text-decoration: none;
+}
 
 .room-title { margin-bottom: 20px; }
 .room-title h2 { margin: 0 0 6px; font-size: 30px; }
