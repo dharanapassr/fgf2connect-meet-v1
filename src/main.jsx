@@ -140,7 +140,11 @@ function AdminPanel({ roomCode, hostToken, onClose }) {
     }
   };
 
-  const invite = `${window.location.origin}/r/${roomCode}`;
+  const inviteUrl = new URL(`/r/${roomCode}`, window.location.origin);
+  // LINE opens links with this documented parameter in the device's external
+  // browser, where WebRTC camera and microphone capture are supported.
+  inviteUrl.searchParams.set('openExternalBrowser', '1');
+  const invite = inviteUrl.toString();
 
   const copyInvite = async () => {
     await navigator.clipboard.writeText(invite);
