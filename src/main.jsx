@@ -23,6 +23,15 @@ import {
 } from 'lucide-react';
 
 const API = '/api';
+const MEDIA_DEVICE_ERROR_NAMES = new Set([
+  'NotAllowedError',
+  'PermissionDeniedError',
+  'NotFoundError',
+  'DevicesNotFoundError',
+  'NotReadableError',
+  'TrackStartError',
+  'OverconstrainedError',
+]);
 
 function roomFromPath() {
   const match = window.location.pathname.match(/^\/r\/([A-Za-z0-9_-]+)$/);
@@ -207,6 +216,13 @@ function Meeting({ roomCode, joinInfo, userChoices, isHost, hostToken }) {
   const failed = useRef(false);
 
   const onError = (error) => {
+    // LiveKit also calls onError when initial camera/microphone publication
+    // fails after signaling connects. Keep the participant in the room so the
+    // ControlBar can retry the device instead of showing a connection failure.
+    if (MEDIA_DEVICE_ERROR_NAMES.has(error?.name)) {
+      console.error('[LiveKit] initial media device failed', { errorType: error.name });
+      return;
+    }
     failed.current = true;
     // Never log the SDK error object: it may include a URL containing the JWT.
     const message = /invalid token|unauthorized|401/i.test(error?.message || '')
@@ -235,6 +251,9 @@ function Meeting({ roomCode, joinInfo, userChoices, isHost, hostToken }) {
         audio={userChoices.audioEnabled}
         onConnected={() => { connected.current = true; }}
         onError={onError}
+        onMediaDeviceFailure={(failure, kind) => {
+          console.error('[LiveKit] media device failure', { failure, kind });
+        }}
         onDisconnected={(reason) => {
           if (connected.current && !failed.current && reason === DisconnectReason.CLIENT_INITIATED) {
             window.location.href = '/';
